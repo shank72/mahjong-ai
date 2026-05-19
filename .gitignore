@@ -1,0 +1,28 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# VS Code
+.vscode/
+
+# Mac / Windows junk
+*.swp
