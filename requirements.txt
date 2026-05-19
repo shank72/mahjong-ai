@@ -1,0 +1,28 @@
+# ── core mahjong logic ──────────────────────────────────────────────
+mahjong>=2.0.0
+
+# ── data pipeline ───────────────────────────────────────────────────
+requests>=2.31.0          # downloading Tenhou logs
+lxml>=5.2.0               # fast XML parsing for .mjlog files
+numpy>=1.26.0
+pandas>=2.2.0
+tqdm>=4.66.0              # progress bars during dataset build
+
+# ── ml / training ───────────────────────────────────────────────────
+torch>=2.3.0              # neural net(CPU build fine for dev; install CUDA build for training)
+scikit-learn>=1.5.0       # train/val split, metrics
+shap>=0.45.0              # explainability for discard model
+
+# ── api ─────────────────────────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.7.0
+
+# ── notebooks / exploration ──────────────────────────────────────────
+jupyter>=1.0.0
+matplotlib>=3.9.0
+seaborn>=0.13.0
+
+# ── dev / testing ───────────────────────────────────────────────────
+pytest>=8.2.0
+httpx>=0.27.0             # async test client for FastAPI

@@ -4,7 +4,7 @@ venv/
 env/
 
 .env
-*.txt
+venv.txt
 
 # Python cache
 __pycache__/
