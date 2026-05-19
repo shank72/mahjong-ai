@@ -1,3 +1,5 @@
+import numpy as np
+
 def state_to_features(state):
     """
     Convert MahjongState into numeric feature vector of length 375.
