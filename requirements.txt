@@ -2,6 +2,8 @@
 mahjong>=2.0.0
 
 # ── data pipeline ───────────────────────────────────────────────────
+kaggle>=1.5.0             # for downloading datasets from Kaggle
+python-dotenv>=1.0.0     # for loading environment variables from a .env file
 requests>=2.31.0          # downloading Tenhou logs
 lxml>=5.2.0               # fast XML parsing for .mjlog files
 numpy>=1.26.0

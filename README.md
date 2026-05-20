@@ -77,9 +77,10 @@ Each training example encodes the full game state as a fixed-length vector:
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/your-username/riichi-mahjong-ai.git
-cd riichi-mahjong-ai
-python -m venv venv && source venv/bin/activate
+#git clone https://github.com/your-username/riichi-mahjong-ai.git
+#cd riichi-mahjong-ai
+py -3.11 -m venv myvenv
+source myvenv/Scripts/activate
 pip install -r requirements.txt
 ```
 

@@ -6,6 +6,10 @@ env/
 .env
 venv.txt
 
+# datasets
+data/raw/
+data/processed/
+
 # Python cache
 __pycache__/
 *.pyc
