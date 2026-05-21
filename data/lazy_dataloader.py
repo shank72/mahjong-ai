@@ -67,7 +67,6 @@ class MahjongDataset(Dataset):
         #compressed = row[0]
         compressed = row[1]
 
-
         # decompress gzip
         decompressed = gzip.decompress(compressed)
 

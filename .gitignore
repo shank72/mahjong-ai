@@ -9,6 +9,8 @@ venv.txt
 # datasets
 data/raw/
 data/processed/
+dataset_X.npy
+dataset_y.npy
 
 # Python cache
 __pycache__/

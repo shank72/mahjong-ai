@@ -130,10 +130,7 @@ def encode_opponent_riichi(record: dict) -> np.ndarray:
     return np.array(flags, dtype=np.float32)
 
 
-# ─────────────────────────────────────────────────────────────
 # main encoder
-# ─────────────────────────────────────────────────────────────
-
 def encode(record: dict):
     """
     Convert raw dataset record into:
@@ -145,84 +142,54 @@ def encode(record: dict):
 
     hand = record["hand_tiles"]
 
-    # ---------------------------------------------------------
     # hand
-    # ---------------------------------------------------------
-
     vec[0:34] = tiles_to_34_array(hand)
 
-    # ---------------------------------------------------------
     # dora indicators
-    # ---------------------------------------------------------
-
     vec[34:68] = tiles_to_34_array(
         record["dora_indicators"]
     )
 
-    # ---------------------------------------------------------
     # seat wind
-    # ---------------------------------------------------------
-
     vec[68:72] = encode_wind(
         record["player_wind"]
     )
 
-    # ---------------------------------------------------------
     # round wind
-    # ---------------------------------------------------------
-
     round_wind = record["round_wind"] // 4
 
     vec[72:76] = encode_wind(
         min(round_wind, 3)
     )
 
-    # ---------------------------------------------------------
     # turn number
-    # ---------------------------------------------------------
-
     remain_tiles = record["remain_tiles"]
 
     approx_turn = (70 - remain_tiles) / 4
 
     vec[76] = min(approx_turn / MAX_TURNS, 1.0)
 
-    # ---------------------------------------------------------
     # shanten
-    # ---------------------------------------------------------
-
     shanten = compute_shanten(hand)
-
     vec[77] = max(shanten, 0) / MAX_SHANTEN
 
+    # is the hand in tenpai?
     vec[78] = 1.0 if shanten == 0 else 0.0
 
-    # ---------------------------------------------------------
     # aka dora
-    # ---------------------------------------------------------
-
     vec[79:82] = encode_aka_dora(hand)
 
-    # ---------------------------------------------------------
     # opponent discards
-    # ---------------------------------------------------------
-
     opp_discards = encode_opponent_discards(record)
 
     vec[82:116] = opp_discards[0]
     vec[116:150] = opp_discards[1]
     vec[150:184] = opp_discards[2]
 
-    # ---------------------------------------------------------
     # opponent riichi
-    # ---------------------------------------------------------
-
     vec[184:187] = encode_opponent_riichi(record)
 
-    # ---------------------------------------------------------
     # label
-    # ---------------------------------------------------------
-
     action_idx = record["action_idx"]
 
     action = record["valid_actions"][action_idx]
@@ -234,10 +201,7 @@ def encode(record: dict):
     return vec, label
 
 
-# ─────────────────────────────────────────────────────────────
 # batch encoder
-# ─────────────────────────────────────────────────────────────
-
 def encode_batch(records: list[dict]):
     X = []
     y = []
