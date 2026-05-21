@@ -82,6 +82,7 @@ Each training example encodes the full game state as a fixed-length vector:
 py -3.11 -m venv myvenv
 source myvenv/Scripts/activate
 pip install -r requirements.txt
+kaggle datasets download -d hphphp123321/tenhou-4-player-riichi-mahjong-dataset -p data/raw
 ```
 
 ### 2. Download and build the dataset
