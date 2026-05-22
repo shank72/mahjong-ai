@@ -2,11 +2,16 @@ import torch
 import torch.nn as nn
 
 class MahjongMLP(nn.Module):
-    def __init__(self, input_dim=187, num_classes=34, dropout_rate=0.3):
+    def __init__(self, input_dim=187, num_classes=34, dropout_rate=0.2): # drop oroginally 0.3
         super().__init__()
         
         self.net = nn.Sequential(
-            nn.Linear(input_dim, 256),
+            nn.Linear(input_dim, 512),
+            nn.BatchNorm1d(512),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            
+            nn.Linear(512, 256),
             nn.BatchNorm1d(256),
             nn.ReLU(),
             nn.Dropout(dropout_rate),
