@@ -7,14 +7,20 @@ from sklearn.preprocessing import StandardScaler
 
 
 class MahjongMLP(nn.Module):
-    def __init__(self, input_dim=187, num_classes=34):
+    def __init__(self, input_dim=187, num_classes=34, dropout_rate=0.3):
         super().__init__()
-
+        
         self.net = nn.Sequential(
             nn.Linear(input_dim, 256),
+            nn.BatchNorm1d(256),
             nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            
             nn.Linear(256, 128),
+            nn.BatchNorm1d(128),
             nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            
             nn.Linear(128, num_classes)
         )
 
@@ -51,7 +57,7 @@ criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
 # training loop
-for epoch in range(100):
+for epoch in range(150):
     model.train()
     total_loss = 0
 
@@ -70,10 +76,13 @@ for epoch in range(100):
 # evaluation
 model.eval()
 with torch.no_grad():
-    preds = model(X_test).argmax(dim=1)
-    acc = (preds == y_test).float().mean()
+    test_preds = model(X_test).argmax(dim=1)
+    test_acc = (test_preds == y_test).float().mean()
+    train_preds = model(X_train).argmax(dim=1)
+    train_acc = (train_preds == y_train).float().mean()
 
-print("Test Accuracy:", acc.item())
+print("Test Accuracy:", test_acc.item())
+print("Train Accuracy:", train_acc.item())
 
 
 # 5000 samples
@@ -82,3 +91,6 @@ print("Test Accuracy:", acc.item())
 # 50 epochs:  .23600 accuracy
 # 75 epochs:  .24799 accuracy
 # 100 epochs: .25100 accuracy
+
+# 50000 samples
+# 100 epochs:  .39809 accuracy

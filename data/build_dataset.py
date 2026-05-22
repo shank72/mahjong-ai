@@ -2,7 +2,7 @@ import numpy as np
 from tqdm import tqdm
 from lazy_dataloader import MahjongDataset
 from feature_encoder import encode
-
+import time
 
 def build_dataset(db_path, table="Discard", limit=None, out_prefix="dataset"):
     """
@@ -58,6 +58,8 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--out", default="dataset")
 
+    start_time = time.perf_counter()
+
     args = parser.parse_args()
 
     build_dataset(
@@ -67,5 +69,8 @@ if __name__ == "__main__":
         out_prefix=args.out
     )
 
+    end_time = time.perf_counter()
+    total_time = end_time - start_time
+    print(f"Total time: {total_time:.4f} seconds")
+
     # python data/build_dataset.py --db data/raw/datasets_positive.db --limit 200000
-    
