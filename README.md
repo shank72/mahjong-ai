@@ -87,11 +87,13 @@ kaggle datasets download -d hphphp123321/tenhou-4-player-riichi-mahjong-dataset 
 
 ### 2. Download and build the dataset
 
-```bash
-python data/download_logs.py --year 2023 --out data/raw/
-python data/parse_tenhou.py  --in  data/raw/ --out data/parsed/
-python data/build_dataset.py --in  data/parsed/ --out data/dataset.npz
-```
+for discard-only model, run in following order: (2-5 are in data/discard-only/)
+1. extract_db_from_zip.py
+2. lazy_dataloader.py
+3. lazy_dataloader_check.py   [just used to check if lazy_dataloader.py works]
+4. feature_encoder.py
+5. build_dataset.py           [command given @ end of file to build dataset]
+6. run train_nn in models/discard-only/
 
 Parsing ~100k logs takes around 10–15 minutes. The resulting dataset is ~500MB.
 

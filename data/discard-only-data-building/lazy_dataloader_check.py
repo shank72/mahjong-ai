@@ -1,4 +1,4 @@
-from data.lazy_dataloader import MahjongDataset
+from lazy_dataloader import MahjongDataset
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
