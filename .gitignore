@@ -7,10 +7,9 @@ env/
 venv.txt
 
 # datasets
-data/raw/
-data/processed/
-dataset_X.npy
-dataset_y.npy
+data-extraction/raw/
+*.npy
+
 
 # Python cache
 __pycache__/

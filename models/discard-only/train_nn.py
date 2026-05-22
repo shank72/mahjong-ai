@@ -15,10 +15,10 @@ BATCH_SIZE = 256
 LEARNING_RATE = 1e-3
 WEIGHT_DECAY = 1e-4
 EPOCHS = 100
-DROPOUT_RATE = 0.3
+DROPOUT_RATE = 0.2
 PATIENCE = 10
 CHECKPOINT_DIR = "checkpoints"
-LOG_DIR = "logs"
+LOG_DIR = "logs/discard-only/"
 # ------------------------------------------------
 
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
@@ -33,8 +33,8 @@ def calculate_top_k_accuracy(logits, targets, k=3):
 
 # Load and process data
 print("[INFO] Loading datasets...")
-X = np.load("dataset_X.npy")
-y = np.load("dataset_y.npy")
+X = np.load("datasets/discard-only/dataset_X.npy")
+y = np.load("datasets/discard-only/dataset_y.npy")
 
 scaler = StandardScaler()
 X = scaler.fit_transform(X)

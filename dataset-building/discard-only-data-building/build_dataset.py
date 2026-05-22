@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from tqdm import tqdm
 from lazy_dataloader import MahjongDataset
@@ -40,6 +41,10 @@ def build_dataset(db_path, table="Discard", limit=None, out_prefix="dataset"):
     print("X shape:", X.shape)
     print("y shape:", y.shape)
 
+    out_dir = os.path.dirname(out_prefix)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+
     np.save(f"{out_prefix}_X.npy", X)
     np.save(f"{out_prefix}_y.npy", y)
 
@@ -74,3 +79,6 @@ if __name__ == "__main__":
     print(f"Total time: {total_time:.4f} seconds")
 
     # python data/build_dataset.py --db data/raw/datasets_positive.db --limit 200000
+    '''
+    python dataset-building/discard-only-data-building/build_dataset.py  --db data-extraction/raw/datasets_positive.db  --out datasets/discard-only/dataset --limit 500000
+    '''

@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 # Absolute imports from your specific model folder
-from model.networks import MahjongDiscardMLP, MahjongBinaryMLP
+from nn_model import MahjongDiscardMLP, MahjongBinaryMLP
 
 # Argument Parsing for dynamic table orchestration
 parser = argparse.ArgumentParser(description="Unified Mahjong Engine Training Script")
@@ -26,10 +26,10 @@ BATCH_SIZE = 256
 LEARNING_RATE = 1e-3
 WEIGHT_DECAY = 1e-4
 EPOCHS = 100
-DROPOUT_RATE = 0.3
+DROPOUT_RATE = 0.2
 PATIENCE = 10
 CHECKPOINT_DIR = f"checkpoints/{TASK}"
-LOG_DIR = f"logs/{TASK}"
+LOG_DIR = f"logs/full-context/{TASK}"
 # ------------------------------------------------
 
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
