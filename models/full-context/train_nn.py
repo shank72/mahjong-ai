@@ -56,7 +56,7 @@ y = np.load(y_path)
 scaler = StandardScaler()
 X = scaler.fit_transform(X)
 
-X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
 # Convert to tensors
 X_train = torch.tensor(X_train, dtype=torch.float32)
@@ -89,6 +89,8 @@ if IS_BINARY:
     log_file.write("epoch,train_loss,val_loss,val_acc_top1\n")
 else:
     log_file.write("epoch,train_loss,val_loss,val_acc_top1,val_acc_top3\n")
+
+start_time = time.time()
 
 for epoch in range(EPOCHS):
     model.train()
@@ -154,6 +156,14 @@ for epoch in range(EPOCHS):
 log_file.close()
 print("[DONE] Training complete.")
 
+end_time = time.time()
+total_duration = end_time - start_time
+
+# Format time to hours, minutes, seconds
+hours = int(total_duration // 3600)
+minutes = int((total_duration % 3600) // 60)
+seconds = total_duration % 60
+
 # =====================================================================
 # FINAL EVALUATION: TRAIN VS TEST COMPARISON
 
@@ -204,6 +214,7 @@ final_val_acc3 = total_val_top3 / len(X_val)
 # Final comparative terminal display output
 print("\n### METRIC SUMMARY ###")
 print(f"Train Dataset Size: {len(X_train)} | Val Dataset Size: {len(X_val)}")
+print(f"Total Execution Wall Time: {hours}h {minutes}m {seconds:.2f}s")
 print("-" * 50)
 print(f"Top-1 Accuracy / Decision Precision Match:")
 print(f"  -> Train Accuracy: {final_train_acc1 * 100:.2f}%")
