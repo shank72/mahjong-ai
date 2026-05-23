@@ -213,14 +213,14 @@ if __name__ == "__main__":
 python dataset-building/full-context-data-building/build_dataset.py --db data-extraction/raw/datasets_positive.db --table Discard --limit 500000 --out datasets/full-context/discard
 
 # 2. Primary Meld Engines (High contextual nuance)
-python dataset-building/full-context-data-building/build_dataset.py --db data-extraction/raw/datasets_positive.db --table Chi --limit 100000 --out datasets/full-context/chi
-python dataset-building/full-context-data-building/build_dataset.py --db data-extraction/raw/datasets_positive.db --table Pon --limit 100000 --out datasets/full-context/pon
+python dataset-building/full-context-data-building/build_dataset.py --db data-extraction/raw/datasets_positive.db --table Chi --limit 200000 --out datasets/full-context/chi
+python dataset-building/full-context-data-building/build_dataset.py --db data-extraction/raw/datasets_positive.db --table Pon --limit 200000 --out datasets/full-context/pon
 
 # 3. Special Strategic State
-python dataset-building/full-context-data-building/build_dataset.py --db data-extraction/raw/datasets_positive.db --table Riichi --limit 50000 --out datasets/full-context/riichi
+python dataset-building/full-context-data-building/build_dataset.py --db data-extraction/raw/datasets_positive.db --table Riichi --limit 200000 --out datasets/full-context/riichi
 
 # 4. Rare Kan Mechanics (Capped cleanly at the data floor boundary)
-python dataset-building/full-context-data-building/build_dataset.py --db data-extraction/raw/datasets_positive.db --table DaiMinKan --limit 20000 --out datasets/full-context/daiminkan
-python dataset-building/full-context-data-building/build_dataset.py --db data-extraction/raw/datasets_positive.db --table AnKan --limit 20000 --out datasets/full-context/ankan
-python dataset-building/full-context-data-building/build_dataset.py --db data-extraction/raw/datasets_positive.db --table ShouMinKan --limit 20000 --out datasets/full-context/shouminkan
+python dataset-building/full-context-data-building/build_dataset.py --db data-extraction/raw/datasets_positive.db --table DaiMinKan --limit 30000 --out datasets/full-context/daiminkan
+python dataset-building/full-context-data-building/build_dataset.py --db data-extraction/raw/datasets_positive.db --table AnKan --limit 30000 --out datasets/full-context/ankan
+python dataset-building/full-context-data-building/build_dataset.py --db data-extraction/raw/datasets_positive.db --table ShouMinKan --limit 30000 --out datasets/full-context/shouminkan
 '''

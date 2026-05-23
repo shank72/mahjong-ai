@@ -26,9 +26,10 @@ BATCH_SIZE = 256
 LEARNING_RATE = 1e-3
 WEIGHT_DECAY = 1e-4
 EPOCHS = 100
-DROPOUT_RATE = 0.2
+DISCARD_DROPOUT_RATE = 0.2
+BINARY_DROPOUT_RATE = 0.3
 PATIENCE = 10
-CHECKPOINT_DIR = f"checkpoints/{TASK}"
+CHECKPOINT_DIR = f"checkpoints/full-context/{TASK}"
 LOG_DIR = f"logs/full-context/{TASK}"
 # ------------------------------------------------
 
@@ -70,10 +71,10 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"[INFO] Using device: {device}")
 
 if IS_BINARY:
-    model = MahjongBinaryMLP(dropout_rate=DROPOUT_RATE).to(device)
+    model = MahjongBinaryMLP(dropout_rate=BINARY_DROPOUT_RATE).to(device)
     print("[MODEL] Instantiated MahjongBinaryMLP (2 Output Target Classes)")
 else:
-    model = MahjongDiscardMLP(dropout_rate=DROPOUT_RATE).to(device)
+    model = MahjongDiscardMLP(dropout_rate=DISCARD_DROPOUT_RATE).to(device)
     print("[MODEL] Instantiated MahjongDiscardMLP (34 Output Target Tile Classes)")
 
 criterion = nn.CrossEntropyLoss()
@@ -103,33 +104,38 @@ for epoch in range(EPOCHS):
         loss.backward()
         optimizer.step()
         
-        total_train_loss += loss.item()
+        # Multiply by batch size to get total loss for this batch
+        total_train_loss += loss.item() * xb.size(0) 
+        
+    # Calculate true averaged per-sample training loss
+    avg_train_loss = total_train_loss / len(X_train)
         
     # Validation phase
     model.eval()
-    total_val_loss = 0
     
     with torch.no_grad():
         X_val_dev, y_val_dev = X_val.to(device), y_val.to(device)
         val_logits = model(X_val_dev)
         val_loss = criterion(val_logits, y_val_dev)
-        total_val_loss = val_loss.item()
+        
+        # PyTorch's loss defaults to reduction='mean', so this is already a clean average
+        avg_val_loss = val_loss.item() 
         
         val_acc_top1 = calculate_top_k_accuracy(val_logits, y_val_dev, k=1)
         val_acc_top3 = calculate_top_k_accuracy(val_logits, y_val_dev, k=3)
 
     if IS_BINARY:
-        print(f"Epoch {epoch+1:02d} | Train Loss: {total_train_loss:.2f} | Val Loss: {total_val_loss:.2f} | Val Acc: {val_acc_top1 * 100:.2f}%")
-        log_file.write(f"{epoch+1},{total_train_loss},{total_val_loss},{val_acc_top1}\n")
+        print(f"Epoch {epoch+1:02d} | Train Loss: {avg_train_loss:.2f} | Val Loss: {avg_val_loss:.2f} | Val Acc: {val_acc_top1 * 100:.2f}%")
+        log_file.write(f"{epoch+1},{avg_train_loss},{avg_val_loss},{val_acc_top1}\n")
     else:
-        print(f"Epoch {epoch+1:02d} | Train Loss: {total_train_loss:.2f} | Val Loss: {total_val_loss:.2f} | Val Top-1 Acc: {val_acc_top1:.4f} | Val Top-3 Acc: {val_acc_top3:.4f}")
-        log_file.write(f"{epoch+1},{total_train_loss},{total_val_loss},{val_acc_top1},{val_acc_top3}\n")
+        print(f"Epoch {epoch+1:02d} | Train Loss: {avg_train_loss:.2f} | Val Loss: {avg_val_loss:.2f} | Val Top-1 Acc: {val_acc_top1:.4f} | Val Top-3 Acc: {val_acc_top3:.4f}")
+        log_file.write(f"{epoch+1},{avg_train_loss},{avg_val_loss},{val_acc_top1},{val_acc_top3}\n")
     
     log_file.flush()
 
     # Checkpoint logic
-    if total_val_loss < best_val_loss:
-        best_val_loss = total_val_loss
+    if avg_val_loss < best_val_loss:
+        best_val_loss = avg_val_loss
         patience_counter = 0
         checkpoint_path = os.path.join(CHECKPOINT_DIR, "best_model.pt")
         torch.save({
