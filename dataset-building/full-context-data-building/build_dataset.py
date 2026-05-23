@@ -3,6 +3,9 @@ from tqdm import tqdm
 from pathlib import Path
 import time
 import argparse
+import sqlite3
+import gzip
+import json
 
 from lazy_dataloader import MahjongDataset
 from feature_encoder import encode_state_vector, tile_to_34
@@ -18,7 +21,7 @@ def get_target_label(record: dict, table: str) -> int:
     if table == "Discard":
         return tile_to_34(chosen_action["tiles"][0])
         
-    # FIX: Updated to map precisely to your custom database schema IDs
+    # Mapping precisely to your custom database schema IDs
     table_action_mapping = {
         "Chi": 2,
         "Pon": 3,
@@ -85,51 +88,62 @@ def build_dataset(db_path, table="Discard", limit=None, out_prefix="dataset"):
         pbar_pos.close()
         pos_dataset.close()
         
-        # 2. Gather the NEGATIVE instances (The pass/skips from the central Skip table)
-        print(f" -> Mining {half_limit} valid 'Skips' from table: Skip")
+        # 2. Gather the NEGATIVE instances (Dynamic Table Selector)
+        # Riichi choices happen on a player's own turn, so skips are found in Discard, not Skip
+        own_turn_tables = ["Riichi", "AnKan", "ShouMinKan"]
+        negative_source_table = "Discard" if table in own_turn_tables else "Skip"
+        print(f" -> Mining {half_limit} valid 'Skips' from table: {negative_source_table}")
         
-        skip_dataset = MahjongDataset(db_path=db_path, table="Skip", limit=None)
+        table_to_type = {
+            "Chi": 2, "Pon": 3, "DaiMinKan": 4, 
+            "AnKan": 5, "ShouMinKan": 6, "Riichi": 7
+        }
+        target_type = table_to_type[table]
+        
+        # Open an independent streaming connection directly
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+        
         skips_collected = 0
-        
         pbar_neg = tqdm(total=half_limit, desc="Collecting Skips")
         
-        for i in range(skip_dataset.length):
-            if skips_collected >= half_limit:
+        chunk_size = 50000
+        offset = 0
+        
+        while skips_collected < half_limit:
+            # Dynamically stream from either Discard or Skip based on the action rules
+            query = f"SELECT Data FROM {negative_source_table} LIMIT ? OFFSET ?"
+            cursor.execute(query, (chunk_size, offset))
+            rows = cursor.fetchall()
+            
+            if not rows:
+                print(f"\n[WARNING] Reached the final row boundary of {negative_source_table} before fulfilling sample requirements!")
                 break
-            try:
-                record = skip_dataset[i]
-                if record is None:
-                    break
                 
-                # FIX: Match structural context using raw integer comparisons matching your logs
-                valid_types = [act.get("type") for act in record["valid_actions"]]
-                is_valid_skip_context = False
-
-                # Adjusted filtering blocks to reflect verified type positions
-                if table == "Chi" and 2 in valid_types:
-                    is_valid_skip_context = True
-                elif table == "Pon" and 3 in valid_types:
-                    is_valid_skip_context = True
-                elif table == "Riichi" and 7 in valid_types:
-                    is_valid_skip_context = True
-                elif table == "DaiMinKan" and 4 in valid_types:
-                    is_valid_skip_context = True
-                elif table == "AnKan" and 5 in valid_types:
-                    is_valid_skip_context = True
-                elif table == "ShouMinKan" and 6 in valid_types:
-                    is_valid_skip_context = True
-
-                if is_valid_skip_context:
-                    X.append(encode_state_vector(record))
-                    y.append(0)  # It's a verified passive skip
-                    skips_collected += 1
-                    pbar_neg.update(1)
-            except (IndexError, KeyError):
-                break
-            except Exception:
-                continue
+            for row in rows:
+                if skips_collected >= half_limit:
+                    break
+                    
+                try:
+                    compressed = row[0]
+                    decompressed = gzip.decompress(compressed)
+                    record = json.loads(decompressed.decode("utf-8"))
+                    
+                    # Extract active decision options
+                    valid_types = [act.get("type") for act in record["valid_actions"]]
+                    
+                    if target_type in valid_types:
+                        X.append(encode_state_vector(record))
+                        y.append(0)  # Verified passive choice skip
+                        skips_collected += 1
+                        pbar_neg.update(1)
+                except Exception:
+                    continue
+            
+            offset += chunk_size
+            
         pbar_neg.close()
-        skip_dataset.close()
+        conn.close()
 
     # --- AUTOMATED DATA BALANCE INSURANCE ---
     if is_binary:
@@ -142,7 +156,7 @@ def build_dataset(db_path, table="Discard", limit=None, out_prefix="dataset"):
             min_samples = min(pos_count, neg_count)
             
             if min_samples == 0:
-                print("[CRITICAL ERROR] One of your data buckets is completely empty! Check types.")
+                print("[CRITICAL ERROR] One of your data buckets is completely empty! Check pipeline data integrity logs.")
                 return
                 
             print(f" -> Automatically balancing dataset down to {min_samples} rows per class.")

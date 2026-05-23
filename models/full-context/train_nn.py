@@ -15,7 +15,7 @@ from nn_model import MahjongDiscardMLP, MahjongBinaryMLP
 parser = argparse.ArgumentParser(description="Unified Mahjong Engine Training Script")
 parser.add_argument("--task", type=str, default="discard", choices=["discard", "pon", "chi", "riichi", "daiminkan", "shouminkan", "ankan"],
                     help="Target strategy table to optimize")
-parser.add_argument("--data_dir", type=str, default="data/processed", help="Path to pre-built numpy tensors")
+parser.add_argument("--data_dir", type=str, default="datasets/full-context", help="Path to pre-built numpy tensors")
 args = parser.parse_args()
 
 TASK = args.task.lower()
@@ -210,3 +210,17 @@ if not IS_BINARY:
     print(f"  -> Train Top-3 Accuracy: {final_train_acc3 * 100:.2f}%")
     print(f"  -> Val/Test Top-3 Accuracy: {final_val_acc3 * 100:.2f}%")
 print("="*50)
+
+'''
+python models/full-context/train_nn.py --task discard
+
+python models/full-context/train_nn.py --task chi
+python models/full-context/train_nn.py --task pon
+
+python models/full-context/train_nn.py --task riichi
+
+python models/full-context/train_nn.py --task daiminkan
+python models/full-context/train_nn.py --task ankan
+python models/full-context/train_nn.py --task shouminkan
+
+'''

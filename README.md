@@ -87,8 +87,8 @@ kaggle datasets download -d hphphp123321/tenhou-4-player-riichi-mahjong-dataset 
 
 ### 2. Download and build the dataset
 
-for discard-only model, run in following order: (2-5 are in data/discard-only/)
-1. extract_db_from_zip.py
+for discard-only model, run in following order: (1 in data-extraction; 2-6 in models)
+1. extract_db_from_zip.py     [need to run "kaggle auth login" in bash terminal]
 2. lazy_dataloader.py
 3. lazy_dataloader_check.py   [just used to check if lazy_dataloader.py works]
 4. feature_encoder.py
