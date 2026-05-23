@@ -18,9 +18,9 @@ def get_target_label(record: dict, table: str) -> int:
     if table == "Discard":
         return tile_to_34(chosen_action["tiles"][0])
         
-    # Define a clean mapping of table names to their expected active Tenhou IDs
+    # FIX: Updated to map precisely to your custom database schema IDs
     table_action_mapping = {
-        "Chi": 1,
+        "Chi": 2,
         "Pon": 3,
         "DaiMinKan": 4,
         "AnKan": 5,
@@ -45,13 +45,21 @@ def build_dataset(db_path, table="Discard", limit=None, out_prefix="dataset"):
         # --- STANDARD MULTI-CLASS DISCARD TRACK ---
         print(f"[INFO] Compiling multi-class engine matrices from table: {table}")
         dataset = MahjongDataset(db_path=db_path, table=table, limit=limit)
-        for i in tqdm(range(len(dataset))):
+        
+        pbar = tqdm(total=dataset.length, desc=f"Processing {table}")
+        for i in range(dataset.length):
             try:
                 record = dataset[i]
+                if record is None:
+                    break
                 X.append(encode_state_vector(record))
                 y.append(get_target_label(record, table))
+                pbar.update(1)
+            except (IndexError, KeyError):
+                break
             except Exception:
                 continue
+        pbar.close()
         dataset.close()
     else:
         # --- BALANCED BINARY MELDMATH ENGINE ---
@@ -60,60 +68,89 @@ def build_dataset(db_path, table="Discard", limit=None, out_prefix="dataset"):
         # 1. Gather the POSITIVE instances (The actual action calls)
         print(f" -> Mining {half_limit} 'Calls' from table: {table}")
         pos_dataset = MahjongDataset(db_path=db_path, table=table, limit=half_limit)
-        for i in tqdm(range(len(pos_dataset))):
+        
+        pbar_pos = tqdm(total=pos_dataset.length, desc="Collecting Calls")
+        for i in range(pos_dataset.length):
             try:
                 record = pos_dataset[i]
+                if record is None:
+                    break
                 X.append(encode_state_vector(record))
-                y.append(1) # Forced true: every row in these tables is an action execution
+                y.append(1)  # Forced true: every row in these tables is an action execution
+                pbar_pos.update(1)
+            except (IndexError, KeyError):
+                break
             except Exception:
                 continue
+        pbar_pos.close()
         pos_dataset.close()
         
         # 2. Gather the NEGATIVE instances (The pass/skips from the central Skip table)
         print(f" -> Mining {half_limit} valid 'Skips' from table: Skip")
         
-        # Request a higher lookahead limit because the Skip table contains mix of Pon/Chi/Kan skips
-        skip_dataset = MahjongDataset(db_path=db_path, table="Skip", limit=half_limit * 6)
+        skip_dataset = MahjongDataset(db_path=db_path, table="Skip", limit=None)
         skips_collected = 0
         
-        for i in tqdm(range(len(skip_dataset))):
+        pbar_neg = tqdm(total=half_limit, desc="Collecting Skips")
+        
+        for i in range(skip_dataset.length):
             if skips_collected >= half_limit:
                 break
             try:
                 record = skip_dataset[i]
+                if record is None:
+                    break
                 
-                # Check what action was skipped. We map the target label logic 
-                # against the structural record to make sure it matches the table we want
-                action_idx = record["action_idx"]
-                chosen_action = record["valid_actions"][action_idx]
-                
-                # Verify that this skip row matches the specific action context we are training
-                is_valid_skip_context = False
-                action_type = chosen_action.get("type", 0)
-                
-                # In Tenhou frameworks: Type 0 = Pass/Skip. We examine what ELSE was valid.
+                # FIX: Match structural context using raw integer comparisons matching your logs
                 valid_types = [act.get("type") for act in record["valid_actions"]]
-                
-                if table == "Chi" and 1 in valid_types:       # Type 1 = Chi option was present
+                is_valid_skip_context = False
+
+                # Adjusted filtering blocks to reflect verified type positions
+                if table == "Chi" and 2 in valid_types:
                     is_valid_skip_context = True
-                elif table == "Pon" and 3 in valid_types:     # Type 3 = Pon option was present
+                elif table == "Pon" and 3 in valid_types:
                     is_valid_skip_context = True
-                elif table == "Riichi" and 7 in valid_types:  # Type 7 = Riichi option was present
+                elif table == "Riichi" and 7 in valid_types:
                     is_valid_skip_context = True
-                elif table == "DaiMinKan" and 4 in valid_types: # Type 4 = Open Kan option present
+                elif table == "DaiMinKan" and 4 in valid_types:
                     is_valid_skip_context = True
-                elif table == "AnKan" and 5 in valid_types:     # Type 5 = Closed Kan option present
+                elif table == "AnKan" and 5 in valid_types:
                     is_valid_skip_context = True
-                elif table == "ShouMinKan" and 6 in valid_types: # Type 6 = Added Kan option present
+                elif table == "ShouMinKan" and 6 in valid_types:
                     is_valid_skip_context = True
 
                 if is_valid_skip_context:
                     X.append(encode_state_vector(record))
-                    y.append(0) # It's a verified passive skip
+                    y.append(0)  # It's a verified passive skip
                     skips_collected += 1
+                    pbar_neg.update(1)
+            except (IndexError, KeyError):
+                break
             except Exception:
                 continue
+        pbar_neg.close()
         skip_dataset.close()
+
+    # --- AUTOMATED DATA BALANCE INSURANCE ---
+    if is_binary:
+        y_temp = np.array(y)
+        pos_count = np.sum(y_temp == 1)
+        neg_count = np.sum(y_temp == 0)
+        
+        if pos_count != neg_count:
+            print(f"[WARNING] Asymmetric class extraction detected (Calls: {pos_count} | Skips: {neg_count})")
+            min_samples = min(pos_count, neg_count)
+            
+            if min_samples == 0:
+                print("[CRITICAL ERROR] One of your data buckets is completely empty! Check types.")
+                return
+                
+            print(f" -> Automatically balancing dataset down to {min_samples} rows per class.")
+            X_pos_final = [X[i] for i in range(len(y)) if y[i] == 1][:min_samples]
+            X_neg_final = [X[i] for i in range(len(y)) if y[i] == 0][:min_samples]
+            
+            X = X_pos_final + X_neg_final
+            y = [1] * min_samples + [0] * min_samples
 
     # --- SHUFFLE & EXPORT ---
     X = np.array(X, dtype=np.float32)
