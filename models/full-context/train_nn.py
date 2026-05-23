@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 # Absolute imports from your specific model folder
-from nn_model import MahjongDiscardMLP, MahjongBinaryMLP
+from nn_model import MahjongDiscardMLP, MahjongBinaryMLP, MahjongRichiMLP
 
 # Argument Parsing for dynamic table orchestration
 parser = argparse.ArgumentParser(description="Unified Mahjong Engine Training Script")
@@ -24,11 +24,24 @@ IS_BINARY = TASK != "discard"
 # HYPERPARAMETERS
 BATCH_SIZE = 256
 LEARNING_RATE = 1e-3
-WEIGHT_DECAY = 1e-4
 EPOCHS = 100
 DISCARD_DROPOUT_RATE = 0.2
-BINARY_DROPOUT_RATE = 0.3
 PATIENCE = 10
+
+# Task-specific regularization mappings
+if TASK == "riichi":
+    BINARY_DROPOUT_RATE = 0.5  # Force aggressive weight feature mutation
+    WEIGHT_DECAY = 1e-3        # Tighten L2 constraints to crush memorization
+    
+elif TASK in ["chi", "pon"]:
+    BINARY_DROPOUT_RATE = 0.4
+    WEIGHT_DECAY = 5e-4
+    
+else:  # Keep  highly successful settings for Discard and Kans
+    BINARY_DROPOUT_RATE = 0.3
+    WEIGHT_DECAY = 1e-4
+
+
 CHECKPOINT_DIR = f"checkpoints/full-context/{TASK}"
 LOG_DIR = f"logs/full-context/{TASK}"
 # ------------------------------------------------
@@ -70,7 +83,12 @@ train_loader = DataLoader(TensorDataset(X_train, y_train), batch_size=BATCH_SIZE
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"[INFO] Using device: {device}")
 
-if IS_BINARY:
+
+if TASK == "riichi":
+    # decreased layer sizes & increased dropout to attampt to decrease overfitting
+    model = MahjongRichiMLP(dropout_rate=BINARY_DROPOUT_RATE).to(device)
+    print("[MODEL] Instantiated MahjongRichiMLP (2 Output Target Classes with Riichi-Specific Architecture)")
+elif IS_BINARY:
     model = MahjongBinaryMLP(dropout_rate=BINARY_DROPOUT_RATE).to(device)
     print("[MODEL] Instantiated MahjongBinaryMLP (2 Output Target Classes)")
 else:
