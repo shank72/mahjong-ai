@@ -6,7 +6,7 @@ class MahjongDiscardMLP(nn.Module):
     POLICY 1: The Discard Engine
     Output: 34 values (Raw logits for CrossEntropyLoss)
     """
-    def __init__(self, input_dim=187, num_classes=34, dropout_rate=0.2):
+    def __init__(self, input_dim=240, num_classes=34, dropout_rate=0.2):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(input_dim, 512),
@@ -36,7 +36,7 @@ class MahjongBinaryMLP(nn.Module):
     POLICY 2: The Decision Engine (Used for Chi, Pon, Riichi, and all Kans)
     Output: 2 values ([0: Skip/No, 1: Call/Yes])
     """
-    def __init__(self, input_dim=187, num_classes=2, dropout_rate=0.3):
+    def __init__(self, input_dim=240, num_classes=2, dropout_rate=0.3):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(input_dim, 256), 
@@ -60,7 +60,7 @@ class MahjongRichiMLP(nn.Module):
     POLICY 2: The Decision Engine (Used for Chi, Pon, Riichi, and all Kans)
     Output: 2 values ([0: Skip/No, 1: Call/Yes])
     """
-    def __init__(self, input_dim=187, num_classes=2, dropout_rate=0.3):
+    def __init__(self, input_dim=240, num_classes=2, dropout_rate=0.3):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(input_dim, 128), 
