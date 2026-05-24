@@ -33,7 +33,30 @@ class MahjongDiscardMLP(nn.Module):
 
 class MahjongBinaryMLP(nn.Module):
     """
-    POLICY 2: The Decision Engine (Used for Chi, Pon, Riichi, and all Kans)
+    POLICY 2: The Decision Engine (Used for Chi, Pon, and all Kans)
+    Output: 2 values ([0: Skip/No, 1: Call/Yes])
+    """
+    def __init__(self, input_dim=240, num_classes=2, dropout_rate=0.3):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, 128), 
+            nn.BatchNorm1d(128), 
+            nn.ReLU(), 
+            nn.Dropout(dropout_rate),
+            
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64), 
+            nn.ReLU(), 
+            nn.Dropout(dropout_rate),
+
+            nn.Linear(64, num_classes)
+        )        
+    def forward(self, x):
+        return self.net(x)
+    
+class MahjongRichiMLP(nn.Module):
+    """
+    POLICY 3: The Decision Engine (Riichi)
     Output: 2 values ([0: Skip/No, 1: Call/Yes])
     """
     def __init__(self, input_dim=240, num_classes=2, dropout_rate=0.3):
@@ -49,25 +72,6 @@ class MahjongBinaryMLP(nn.Module):
             nn.ReLU(), 
             nn.Dropout(dropout_rate),
 
-            nn.Linear(128, num_classes)
-        )
-        
-    def forward(self, x):
-        return self.net(x)
-    
-class MahjongRichiMLP(nn.Module):
-    """
-    POLICY 2: The Decision Engine (Used for Chi, Pon, Riichi, and all Kans)
-    Output: 2 values ([0: Skip/No, 1: Call/Yes])
-    """
-    def __init__(self, input_dim=240, num_classes=2, dropout_rate=0.3):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(input_dim, 128), 
-            nn.BatchNorm1d(128), 
-            nn.ReLU(), 
-            nn.Dropout(dropout_rate),
-            
             nn.Linear(128, 64),
             nn.BatchNorm1d(64), 
             nn.ReLU(), 

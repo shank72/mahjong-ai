@@ -34,7 +34,7 @@ if TASK == "riichi":
     WEIGHT_DECAY = 1e-3        # Tighten L2 constraints to crush memorization
     
 elif TASK in ["chi", "pon"]:
-    BINARY_DROPOUT_RATE = 0.4
+    BINARY_DROPOUT_RATE = 0.5
     WEIGHT_DECAY = 5e-4
     
 else:  # Keep  highly successful settings for Discard and Kans
