@@ -7,9 +7,11 @@ import argparse
 from torch.utils.data import TensorDataset, DataLoader
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+# NEW: Added structural metrics primitives for multi-dimensional tracking
+from sklearn.metrics import precision_recall_fscore_support, classification_report
 
 # Absolute imports from your specific model folder
-from nn_model import MahjongDiscardMLP, MahjongBinaryMLP, MahjongRichiMLP
+from nn_model import MahjongDiscardResNet, MahjongBinaryResNet, MahjongRiichiResNet
 
 # Argument Parsing for dynamic table orchestration
 parser = argparse.ArgumentParser(description="Unified Mahjong Engine Training Script")
@@ -37,10 +39,9 @@ elif TASK in ["chi", "pon"]:
     BINARY_DROPOUT_RATE = 0.5
     WEIGHT_DECAY = 5e-4
     
-else:  # Keep  highly successful settings for Discard and Kans
+else:  # Keep highly successful settings for Discard and Kans
     BINARY_DROPOUT_RATE = 0.3
     WEIGHT_DECAY = 1e-4
-
 
 CHECKPOINT_DIR = f"checkpoints/full-context/{TASK}"
 LOG_DIR = f"logs/full-context/{TASK}"
@@ -57,6 +58,19 @@ def calculate_top_k_accuracy(logits, targets, k=3):
         _, pred = logits.topk(k, dim=1, largest=True, sorted=True)
         correct = pred.eq(targets.view(-1, 1).expand_as(pred))
         return correct.any(dim=1).float().mean().item()
+
+# NEW: Unified extraction wrapper for strategic sub-metrics
+def calculate_macro_metrics(logits, targets):
+    """Computes Macro Precision, Recall, and F1-score safely across active target pools"""
+    with torch.no_grad():
+        preds = torch.argmax(logits, dim=1).cpu().numpy()
+        true_labels = targets.cpu().numpy()
+    
+    # zero_division=0 keeps script alive if a class is completely untouched during an epoch
+    precision, recall, f1, _ = precision_recall_fscore_support(
+        true_labels, preds, average='macro', zero_division=0
+    )
+    return precision, recall, f1
 
 # Load specific array pairings dynamically
 print(f"[INFO] Loading target datasets for: {TASK.upper()}")
@@ -83,30 +97,32 @@ train_loader = DataLoader(TensorDataset(X_train, y_train), batch_size=BATCH_SIZE
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"[INFO] Using device: {device}")
 
-
 if TASK == "riichi":
-    # decreased layer sizes & increased dropout to attampt to decrease overfitting
-    model = MahjongRichiMLP(dropout_rate=BINARY_DROPOUT_RATE).to(device)
-    print("[MODEL] Instantiated MahjongRichiMLP (2 Output Target Classes with Riichi-Specific Architecture)")
+    model = MahjongRiichiResNet(dropout_rate=BINARY_DROPOUT_RATE).to(device)
+    print("[MODEL] Instantiated MahjongRiichiResNet (2 Output Target Classes with Riichi-Specific Architecture)")
 elif IS_BINARY:
-    model = MahjongBinaryMLP(dropout_rate=BINARY_DROPOUT_RATE).to(device)
-    print("[MODEL] Instantiated MahjongBinaryMLP (2 Output Target Classes)")
+    model = MahjongBinaryResNet(dropout_rate=BINARY_DROPOUT_RATE).to(device)
+    print("[MODEL] Instantiated MahjongBinaryResNet (2 Output Target Classes)")
 else:
-    model = MahjongDiscardMLP(dropout_rate=DISCARD_DROPOUT_RATE).to(device)
-    print("[MODEL] Instantiated MahjongDiscardMLP (34 Output Target Tile Classes)")
+    model = MahjongDiscardResNet(dropout_rate=DISCARD_DROPOUT_RATE).to(device)
+    print("[MODEL] Instantiated MahjongDiscardResNet (34 Output Target Tile Classes)")
 
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
 
-best_val_loss = float('inf')
+# CHANGED: Monitored target switched from raw validation loss to Macro F1 
+# to aggressively combat class-imbalance blindspots.
+best_val_f1 = -1.0 
 patience_counter = 0
 
 print(f"[INFO] Starting training pipeline for execution framework: {TASK}")
 log_file = open(os.path.join(LOG_DIR, "training_log.csv"), "w")
+
+# CHANGED: Added F1 columns to CSV header footprints
 if IS_BINARY:
-    log_file.write("epoch,train_loss,val_loss,val_acc_top1\n")
+    log_file.write("epoch,train_loss,val_loss,val_acc_top1,val_macro_precision,val_macro_recall,val_macro_f1\n")
 else:
-    log_file.write("epoch,train_loss,val_loss,val_acc_top1,val_acc_top3\n")
+    log_file.write("epoch,train_loss,val_loss,val_acc_top1,val_acc_top3,val_macro_precision,val_macro_recall,val_macro_f1\n")
 
 start_time = time.time()
 
@@ -124,10 +140,8 @@ for epoch in range(EPOCHS):
         loss.backward()
         optimizer.step()
         
-        # Multiply by batch size to get total loss for this batch
         total_train_loss += loss.item() * xb.size(0) 
         
-    # Calculate true averaged per-sample training loss
     avg_train_loss = total_train_loss / len(X_train)
         
     # Validation phase
@@ -138,37 +152,41 @@ for epoch in range(EPOCHS):
         val_logits = model(X_val_dev)
         val_loss = criterion(val_logits, y_val_dev)
         
-        # PyTorch's loss defaults to reduction='mean', so this is already a clean average
         avg_val_loss = val_loss.item() 
         
         val_acc_top1 = calculate_top_k_accuracy(val_logits, y_val_dev, k=1)
         val_acc_top3 = calculate_top_k_accuracy(val_logits, y_val_dev, k=3)
+        
+        # NEW: Process deep precision footprints on validation step
+        val_prec, val_rec, val_f1 = calculate_macro_metrics(val_logits, y_val_dev)
 
+    # CHANGED: Enriched logging strings with detailed performance parameters
     if IS_BINARY:
-        print(f"Epoch {epoch+1:02d} | Train Loss: {avg_train_loss:.2f} | Val Loss: {avg_val_loss:.2f} | Val Acc: {val_acc_top1 * 100:.2f}%")
-        log_file.write(f"{epoch+1},{avg_train_loss},{avg_val_loss},{val_acc_top1}\n")
+        print(f"Epoch {epoch+1:02d} | Train Loss: {avg_train_loss:.3f} | Val Loss: {avg_val_loss:.3f} | Val Acc: {val_acc_top1 * 100:.2f}% | Macro F1: {val_f1 * 100:.2f}%")
+        log_file.write(f"{epoch+1},{avg_train_loss},{avg_val_loss},{val_acc_top1},{val_prec},{val_rec},{val_f1}\n")
     else:
-        print(f"Epoch {epoch+1:02d} | Train Loss: {avg_train_loss:.2f} | Val Loss: {avg_val_loss:.2f} | Val Top-1 Acc: {val_acc_top1:.4f} | Val Top-3 Acc: {val_acc_top3:.4f}")
-        log_file.write(f"{epoch+1},{avg_train_loss},{avg_val_loss},{val_acc_top1},{val_acc_top3}\n")
+        print(f"Epoch {epoch+1:02d} | Train Loss: {avg_train_loss:.3f} | Val Loss: {avg_val_loss:.3f} | Top-1: {val_acc_top1*100:.2f}% | Top-3: {val_acc_top3*100:.2f}% | Macro F1: {val_f1*100:.2f}%")
+        log_file.write(f"{epoch+1},{avg_train_loss},{avg_val_loss},{val_acc_top1},{val_acc_top3},{val_prec},{val_rec},{val_f1}\n")
     
     log_file.flush()
 
-    # Checkpoint logic
-    if avg_val_loss < best_val_loss:
-        best_val_loss = avg_val_loss
+    # CHANGED: Early stopping now targets MAXIMIZING Validation Macro F1 instead of minimizing loss
+    if val_f1 > best_val_f1:
+        best_val_f1 = val_f1
         patience_counter = 0
         checkpoint_path = os.path.join(CHECKPOINT_DIR, "best_model.pt")
         torch.save({
             'epoch': epoch + 1,
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
-            'val_loss': best_val_loss,
+            'val_loss': avg_val_loss,
+            'val_macro_f1': best_val_f1,
         }, checkpoint_path)
     else:
         patience_counter += 1
         
     if patience_counter >= PATIENCE:
-        print(f"[INFO] Early stopping triggered at epoch {epoch+1}.")
+        print(f"[INFO] Early stopping triggered at epoch {epoch+1} based on validation F1 flatline.")
         break
 
 log_file.close()
@@ -177,13 +195,12 @@ print("[DONE] Training complete.")
 end_time = time.time()
 total_duration = end_time - start_time
 
-# Format time to hours, minutes, seconds
 hours = int(total_duration // 3600)
 minutes = int((total_duration % 3600) // 60)
 seconds = total_duration % 60
 
 # =====================================================================
-# FINAL EVALUATION: TRAIN VS TEST COMPARISON
+# FINAL EVALUATION: ENRICHED REPORT OUTPUT
 
 print("\n" + "="*50)
 print(f"[INFO] Running Final Evaluation (Train vs Test) for {TASK.upper()}...")
@@ -199,35 +216,51 @@ else:
 
 model.eval()
 
-# Evaluate on full Training Set
+# Complete Training predictions capture block
 train_eval_loader = DataLoader(TensorDataset(X_train, y_train), batch_size=BATCH_SIZE, shuffle=False)
-total_train_top1 = 0
-total_train_top3 = 0
+all_train_preds = []
+all_train_trues = []
 
 with torch.no_grad():
     for xb, yb in train_eval_loader:
         xb, yb = xb.to(device), yb.to(device)
         logits = model(xb)
-        total_train_top1 += calculate_top_k_accuracy(logits, yb, k=1) * xb.size(0)
-        total_train_top3 += calculate_top_k_accuracy(logits, yb, k=3) * xb.size(0)
+        all_train_preds.append(logits.cpu())
+        all_train_trues.append(yb.cpu())
 
-final_train_acc1 = total_train_top1 / len(X_train)
-final_train_acc3 = total_train_top3 / len(X_train)
+train_logits_all = torch.cat(all_train_preds, dim=0)
+train_trues_all = torch.cat(all_train_trues, dim=0)
 
-# Evaluate on full Validation Set
+final_train_acc1 = calculate_top_k_accuracy(train_logits_all, train_trues_all, k=1)
+final_train_acc3 = calculate_top_k_accuracy(train_logits_all, train_trues_all, k=3)
+_, _, train_f1_macro = calculate_macro_metrics(train_logits_all, train_trues_all)
+
+# Complete Validation predictions capture block
 val_eval_loader = DataLoader(TensorDataset(X_val, y_val), batch_size=BATCH_SIZE, shuffle=False)
-total_val_top1 = 0
-total_val_top3 = 0
+all_val_preds = []
+all_val_trues = []
 
 with torch.no_grad():
     for xb, yb in val_eval_loader:
         xb, yb = xb.to(device), yb.to(device)
         logits = model(xb)
-        total_val_top1 += calculate_top_k_accuracy(logits, yb, k=1) * xb.size(0)
-        total_val_top3 += calculate_top_k_accuracy(logits, yb, k=3) * xb.size(0)
+        all_val_preds.append(logits.cpu())
+        all_val_trues.append(yb.cpu())
 
-final_val_acc1 = total_val_top1 / len(X_val)
-final_val_acc3 = total_val_top3 / len(X_val)
+val_logits_all = torch.cat(all_val_preds, dim=0)
+val_trues_all = torch.cat(all_val_trues, dim=0)
+
+final_val_acc1 = calculate_top_k_accuracy(val_logits_all, val_trues_all, k=1)
+final_val_acc3 = calculate_top_k_accuracy(val_logits_all, val_trues_all, k=3)
+_, _, val_f1_macro = calculate_macro_metrics(val_logits_all, val_trues_all)
+
+# NEW: Print per-class classification matrices directly to console
+print("\n" + "-"*20 + " SCALED CLASSIFICATION REPORT " + "-"*20)
+val_preds_classes = torch.argmax(val_logits_all, dim=1).numpy()
+if IS_BINARY:
+    print(classification_report(val_trues_all.numpy(), val_preds_classes, target_names=['SKIP (0)', 'CALL/RIICHI (1)'], zero_division=0))
+else:
+    print(classification_report(val_trues_all.numpy(), val_preds_classes, zero_division=0))
 
 # Final comparative terminal display output
 print("\n### METRIC SUMMARY ###")
@@ -238,6 +271,10 @@ print(f"Top-1 Accuracy / Decision Precision Match:")
 print(f"  -> Train Accuracy: {final_train_acc1 * 100:.2f}%")
 print(f"  -> Val/Test Accuracy: {final_val_acc1 * 100:.2f}%")
 print(f"  -> Generalization Gap: {(final_train_acc1 - final_val_acc1) * 100:.2f}%")
+print("-" * 50)
+print(f"Strategic Macro-F1 Balancer:")
+print(f"  -> Train Macro F1: {train_f1_macro * 100:.2f}%")
+print(f"  -> Val/Test Macro F1: {val_f1_macro * 100:.2f}%")
 
 if not IS_BINARY:
     print("-" * 50)
@@ -245,7 +282,6 @@ if not IS_BINARY:
     print(f"  -> Train Top-3 Accuracy: {final_train_acc3 * 100:.2f}%")
     print(f"  -> Val/Test Top-3 Accuracy: {final_val_acc3 * 100:.2f}%")
 print("="*50)
-
 '''
 python models/full-context/train_nn.py --task discard
 
